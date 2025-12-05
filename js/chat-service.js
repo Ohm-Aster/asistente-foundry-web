@@ -9,31 +9,44 @@
  * @param {string} userMessage - Texto enviado por el usuario.
  * @returns {Promise<string>} - Respuesta generada por el modelo.
  */
+
+function withTimeout(ms, promise) {
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error("Timeout")), ms)
+  );
+  return Promise.race([promise, timeout]);
+}
+
 async function sendMessageToAssistant(userMessage) {
+  const body = JSON.stringify({ message: userMessage });
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-        const response = await fetch("/api/chat", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ message: userMessage })
-        });
+      const res = await withTimeout(15000, fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body
+      }));
 
-        if (!response.ok) {
-            console.error("HTTP error:", response.status, await response.text());
-            throw new Error("Error en la solicitud");
-        }
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "");
+        throw new Error(`HTTP ${res.status} ${errText}`);
+      }
 
-        const data = await response.json();
+      const data = await res.json();
+      if (!data.reply || typeof data.reply !== "string") {
+        throw new Error("Respuesta inválida del backend");
+      }
+      return data.reply;
 
-        if (!data.reply) {
-            throw new Error("Respuesta inválida del backend");
-        }
-
-        return data.reply;
-
-    } catch (error) {
-        console.error("Error en chat-service:", error);
-        throw error;
+    } catch (err) {
+      // Reintenta una vez en errores transitorios
+      const transient = /Timeout|network|fetch|502|503|504/i.test(String(err));
+      if (!transient || attempt === 2) {
+        console.error("Error en chat-service:", err);
+        throw err;
+      }
+      await new Promise(r => setTimeout(r, 800)); // pequeña espera
     }
+  }
 }
