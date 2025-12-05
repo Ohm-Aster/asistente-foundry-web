@@ -1,9 +1,9 @@
 
-import fetch from "node-fetch";
-
-const FOUNDRY_ENDPOINT = process.env.FOUNDRY_ENDPOINT;
-const FOUNDRY_API_KEY  = process.env.FOUNDRY_API_KEY;
-const FOUNDRY_MODEL    = process.env.FOUNDRY_MODEL || "gpt-4o-mini";
+// api/chat/index.js
+// NO importes node-fetch; usa la fetch nativa de Node 18+
+const FOUNDRY_ENDPOINT = process.env.FOUNDRY_ENDPOINT; // https://asistentewebia.cognitiveservices.azure.com/
+const FOUNDRY_API_KEY  = process.env.FOUNDRY_API_KEY;   // clave válida
+const FOUNDRY_MODEL    = process.env.FOUNDRY_MODEL || "gpt-4o-mini"; // nombre del deployment
 
 export default async function (context, req) {
   try {
@@ -13,7 +13,7 @@ export default async function (context, req) {
       return;
     }
 
-    const url = `${FOUNDRY_ENDPOINT}openai/deployments/${FOUNDRY_MODEL}/chat/completions?api-version=2024-08-01-preview`;
+    const url = `${FOUNDRY_ENDPOINT}openai/deployments/${FOUNDRY_MODEL}/chat/completions?api-version=2025-01-01-preview`;
     const payload = {
       messages: [
         { role: "system", content: "Eres un asistente experto en IA generativa y Azure." },
@@ -22,6 +22,9 @@ export default async function (context, req) {
       max_tokens: 600,
       temperature: 0.7
     };
+
+    // LOG de entrada
+    context.log("Calling Foundry:", { url, model: FOUNDRY_MODEL });
 
     const response = await fetch(url, {
       method: "POST",
@@ -32,17 +35,31 @@ export default async function (context, req) {
       body: JSON.stringify(payload)
     });
 
-    const text = await response.text(); // <-- Captura texto (exito o error)
+    const text = await response.text(); // captura texto (éxito o error)
     if (!response.ok) {
-      context.log.error("Foundry ERROR:", response.status, text);
+      // LOG de error de Foundry
+      context.log.error("Foundry ERROR", response.status, text);
       context.res = { status: 502, body: { error: "Error calling Foundry", detail: text } };
       return;
     }
 
-    const data = JSON.parse(text);
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (jsonErr) {
+      context.log.error("JSON parse error:", jsonErr, text);
+      context.res = { status: 502, body: { error: "Invalid JSON from Foundry", detail: text } };
+      return;
+    }
+
     const reply = data?.choices?.[0]?.message?.content ?? "No se pudo generar respuesta.";
-    context.res = { status: 200, headers: { "Content-Type": "application/json" }, body: { reply } };
+    context.res = {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+      body: { reply }
+    };
   } catch (e) {
+    // LOG de excepción
     context.log.error("Function error:", e);
     context.res = { status: 500, body: { error: "Server error", detail: String(e) } };
   }
