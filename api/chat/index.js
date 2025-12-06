@@ -1,13 +1,12 @@
 
-// api/chat/index.js
-// NO importes node-fetch; usa la fetch nativa de Node 18+
-const FOUNDRY_ENDPOINT = process.env.FOUNDRY_ENDPOINT; // https://asistentewebia.cognitiveservices.azure.com/
-const FOUNDRY_API_KEY  = process.env.FOUNDRY_API_KEY;   // clave válida
-const FOUNDRY_MODEL    = process.env.FOUNDRY_MODEL || "gpt-4o-mini"; // nombre del deployment
+// api/chat/index.js (modelo v3: CommonJS + function.json)
+const FOUNDRY_ENDPOINT = process.env.FOUNDRY_ENDPOINT;   // https://asistentewebia.cognitiveservices.azure.com/
+const FOUNDRY_API_KEY  = process.env.FOUNDRY_API_KEY;     // tu clave válida
+const FOUNDRY_MODEL    = process.env.FOUNDRY_MODEL || "gpt-4o-mini"; // nombre EXACTO del deployment
 
-export default async function (context, req) {
+module.exports = async function (context, req) {
   try {
-    const userMessage = req.body?.message;
+    const userMessage = req.body && req.body.message;
     if (!userMessage) {
       context.res = { status: 400, body: { error: "No message provided" } };
       return;
@@ -23,21 +22,18 @@ export default async function (context, req) {
       temperature: 0.7
     };
 
-    // LOG de entrada
+    // Log mínimo para diagnóstico
     context.log("Calling Foundry:", { url, model: FOUNDRY_MODEL });
 
+    // Node 18+ ya trae fetch global; no necesitas node-fetch
     const response = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "api-key": FOUNDRY_API_KEY
-      },
+      headers: { "Content-Type": "application/json", "api-key": FOUNDRY_API_KEY },
       body: JSON.stringify(payload)
     });
 
-    const text = await response.text(); // captura texto (éxito o error)
+    const text = await response.text();
     if (!response.ok) {
-      // LOG de error de Foundry
       context.log.error("Foundry ERROR", response.status, text);
       context.res = { status: 502, body: { error: "Error calling Foundry", detail: text } };
       return;
@@ -53,14 +49,9 @@ export default async function (context, req) {
     }
 
     const reply = data?.choices?.[0]?.message?.content ?? "No se pudo generar respuesta.";
-    context.res = {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-      body: { reply }
-    };
+    context.res = { status: 200, headers: { "Content-Type": "application/json" }, body: { reply } };
   } catch (e) {
-    // LOG de excepción
     context.log.error("Function error:", e);
     context.res = { status: 500, body: { error: "Server error", detail: String(e) } };
   }
-}
+};
