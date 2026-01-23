@@ -70,22 +70,13 @@ Este token permite a GitHub Actions desplegar la aplicación en Static Web Apps.
 
 ---
 
-## ▶️ Despliegue en Azure (resumen)
+## ▶️ Despliegue en Azure
 
 1. Crear recurso **Azure AI Foundry**
 2. Crear implementación con el modelo `gpt-4o-mini`
 3. Crear **Static Web App** y vincular el repositorio
 4. Configurar variables de entorno en Azure (Foundry)
 5. Push al branch `main` 🚀
-
----
-
-## 📸 Capturas (opcional)
-
-> Puedes agregar aquí screenshots de:
-> - La interfaz del asistente
-> - El recurso en Azure
-> - Variables de entorno configuradas
 
 ---
 
